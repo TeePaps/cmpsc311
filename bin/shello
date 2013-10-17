@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Greetings!
+echo Shello world
+
+# Use a variable
+echo Shello "$USER"
+
+# Set a variable
+greetz=Shellutations
+echo "$greetz world"
