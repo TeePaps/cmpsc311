@@ -14,8 +14,16 @@
 #include <cmpsc311_log.h>
 
 // Defines
+#define OUTPUT_FILE "./output.txt"
 
 // Functional Prototypes
+bool valid_address( uint32_t addr );
+SMSA_DRUM_ID get_drum_id( uint32_t addr );
+SMSA_BLOCK_ID get_block_id( uint32_t addr );
+SMSA_BLOCK_ID get_offset( uint32_t addr );
+uint32_t get_instruction( SMSA_DISK_COMMAND opcode, SMSA_DRUM_ID drumId, SMSA_BLOCK_ID blockId );
+void my_read( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readBytes, unsigned char* temp, unsigned char* buf );
+void my_write( uint32_t len, SMSA_BLOCK_ID offset, int firstBlock, int* writtenBytes, unsigned char* temp, unsigned char* buf );
 
 //
 // Global data
@@ -31,15 +39,7 @@
 // Outputs      : -1 if failure or 0 if successful
 
 int smsa_vmount( void ) {
-  int i;
-
-  for (i = 0; i < SMSA_DISK_ARRAY_SIZE; i++) {
-    smsa_operation( get_instruction( SMSA_MOUNT))
-    smsa_operation( get_instruction( SMSA_SEEK_DRUM, i, 0) );
-    smsa_operation( get_instruction( FORMAT_DRUM, i, 0 ) );
-  }
-
-  return 0;
+  return( smsa_operation( get_instruction( SMSA_MOUNT, 0, 0 ), NULL ) );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,13 +51,7 @@ int smsa_vmount( void ) {
 // Outputs      : -1 if failure or 0 if successful
 
 int smsa_vunmount( void )  {
-  const unsigned int bufferSize = SMSA_DISK_ARRAY_SIZE * SMSA_DISK_SIZE - 1;
-  unsigned char buf[bufferSize];
-  int i;
-  
-  smsa_vread( 0, bufferSize, buf ); // get a buffer with all data on disk array
-  write_to_file( buf, OUTPUT_FILE );
-  return 0;
+  return( smsa_operation( get_instruction( SMSA_UNMOUNT, 0, 0 ), NULL ) );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -70,28 +64,30 @@ int smsa_vunmount( void )  {
 //                buf - the place to put the read bytes
 // Outputs      : -1 if failure or 0 if successful
 
-int smsa_vread( SMSA_VIRTUAL_ADDRESS addr, uint32_t len, unsigned char *buf ) {
+int smsa_vread( uint32_t addr, uint32_t len, unsigned char *buf ) {
   if ( !valid_address( addr ) ) {
     return -1;
   }
 
   // Initialize data
-  boolean firstBlock = true;
-  char temp[( SMSA_DISK_SIZE / SMSA_BLOCK_SIZE )]; // temporary byte buffer
-  unsigned int = readBytes = 0;
-  SMSA_DRUM_SIZE drum = get_drum_id( addr );
-  SMSA_BLOCK_SIZE block = get_block_id( addr );
-  SMSA_OFFSET_SIZE offset = get_offset( addr );
+  bool firstBlock = true;
+  unsigned char temp[( SMSA_DISK_SIZE / SMSA_BLOCK_SIZE )]; // temporary byte buffer
+  int readBytes = 0;
+  SMSA_DRUM_ID drum = get_drum_id( addr );
+  SMSA_BLOCK_ID block = get_block_id( addr );
+  SMSA_BLOCK_ID offset = get_offset( addr );
 
   // Loop through as many drums as necessary
   do {
-    smsa_operation( smsa_get_instruction( SMSA_SEEK_DRUM, drum, 0 ), temp );
+    smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, 0 ), NULL );
 
     // Loop through as many blocks as necessary
     do {
-      smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), temp );
+      printf("about to seek");
+      smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
+      printf("about to read");
       smsa_operation( get_instruction( SMSA_DISK_READ, drum, block ), temp );
-      read( len, offset, firstBlock, readBytes, temp, buf );
+      my_read( len, offset, firstBlock, &readBytes, temp, buf );
       firstBlock = false;
       block++;
 
@@ -114,40 +110,40 @@ int smsa_vread( SMSA_VIRTUAL_ADDRESS addr, uint32_t len, unsigned char *buf ) {
 //                buf - the place to read the read from to write
 // Outputs      : -1 if failure or 0 if successful
 
-int smsa_vwrite( SMSA_VIRTUAL_ADDRESS addr, uint32_t len, unsigned char *buf )  {
+int smsa_vwrite( uint32_t addr, uint32_t len, unsigned char *buf )  {
   if ( !valid_address( addr ) ) {
     return -1;
   }
 
   // Initialize data
-  boolean firstBlock = true;
-  char temp[( SMSA_DISK_SIZE / SMSA_BLOCK_SIZE )]; // temporary byte buffer
-  unsigned int = writtenBytes = 0;
-  SMSA_DRUM_SIZE drum = get_drum_id( addr );
-  SMSA_BLOCK_SIZE block = get_block_id( addr );
-  SMSA_OFFSET_SIZE offset = get_offset( addr );
+  int firstBlock = 1;
+  unsigned char temp[SMSA_OFFSET_SIZE]; // temporary byte buffer
+  int writtenBytes = 0;
+  SMSA_DRUM_ID drum = get_drum_id( addr );
+  SMSA_BLOCK_ID block = get_block_id( addr );
+  SMSA_BLOCK_ID offset = get_offset( addr );
 
   // Loop through as many drums as necessary
   do {
-    smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, 0 ), temp );
+    smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, 0 ), NULL );
 
     // Loop through as many blocks as necessary
     do {
-      smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), temp );
-
+      smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
       if ( firstBlock ) {
         smsa_operation( get_instruction( SMSA_DISK_READ, drum, block ), temp );
+        smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
       }
 
-      write( len, offset, firstBlock, readBytes, temp, buf );
+      my_write( len, offset, firstBlock, &writtenBytes, temp, buf );
       smsa_operation( get_instruction( SMSA_DISK_WRITE, drum, block), temp );
-      firstBlock = false;
+      firstBlock = 0;
       block++;
 
-    } while ( ( readBytes < len ) && ( block < SMSA_MAX_BLOCK_ID ) );
+    } while ( ( writtenBytes < len ) && ( block < SMSA_MAX_BLOCK_ID ) );
     drum++;
 
-  } while ( readBytes < len );
+  } while ( writtenBytes < len );
 
   return 0;
 }
@@ -159,9 +155,9 @@ int smsa_vwrite( SMSA_VIRTUAL_ADDRESS addr, uint32_t len, unsigned char *buf )  
 //
 // Inputs       : addr - the address to check
 // Outputs      : true if in range, false if not
-bool valid_address( SMSA_VIRTUAL_ADDRESS ) {
-  if ( addr >= ( SMSA_DISK_SIZE * SMSA_DISK_ARRAY ) ) {
-    logMessage( BAD_DRUM_ID, "Address for read is out of range");
+bool valid_address( uint32_t addr ) {
+  if ( addr > MAX_SMSA_VIRTUAL_ADDRESS) {
+    logMessage( SMSA_BAD_DRUM_ID, "Address for read is out of range");
     return false;
   }
   else {
@@ -177,7 +173,7 @@ bool valid_address( SMSA_VIRTUAL_ADDRESS ) {
 // Inputs       : addr - the address to write to
 // Outputs      : -1 if failure or the drum id if successful
 
-SMSA_DRUM_SIZE get_drum_id ( SMSA_VIRTUAL_ADDRESS addr ) {
+SMSA_DRUM_ID get_drum_id ( uint32_t addr ) {
   return( addr >> 16 );
 }
 
@@ -189,7 +185,7 @@ SMSA_DRUM_SIZE get_drum_id ( SMSA_VIRTUAL_ADDRESS addr ) {
 // Inputs       : addr - the address to write to
 // Outputs      : -1 if failure or the drum id if successful
 
-SMSA_BLOCK_SIZE get_block_id ( SMSA_VIRTUAL_ADDRESS addr ) {
+SMSA_BLOCK_ID get_block_id ( uint32_t addr ) {
   return( ( addr & 0xffff ) >> 8 ); 
 }
 
@@ -201,7 +197,7 @@ SMSA_BLOCK_SIZE get_block_id ( SMSA_VIRTUAL_ADDRESS addr ) {
 // Inputs       : addr - the address to write to
 // Outputs      : -1 if failure or the drum id if successful
 
-SMSA_BLOCK_SIZE get_offset ( SMSA_VIRTUAL_ADDRESS addr ) {
+SMSA_BLOCK_ID get_offset ( uint32_t addr ) {
   return( addr & 0xff ); 
 }
 
@@ -213,7 +209,7 @@ SMSA_BLOCK_SIZE get_offset ( SMSA_VIRTUAL_ADDRESS addr ) {
 // Inputs       : addr - the address to write to
 // Outputs      : -1 if failure or the drum id if successful
 
-uint32_t get_instruction ( SMSA_DISK_COMMAND opcode, SMSA_DRUM_SIZE drumId, SMSA_BLOCK_ID blockId ) {
+uint32_t get_instruction ( SMSA_DISK_COMMAND opcode, SMSA_DRUM_ID drumId, SMSA_BLOCK_ID blockId ) {
     uint32_t instruction = opcode;
     instruction <<= 4; // make room for drumId;
     instruction |= drumId;
@@ -236,7 +232,9 @@ uint32_t get_instruction ( SMSA_DISK_COMMAND opcode, SMSA_DRUM_SIZE drumId, SMSA
 //                buf - 
 // Outputs      : -1 if failure or the drum id if successful
 
-void read( uint32_t len, SMSA_OFFSET_SIZE offset, boolean firstBlock, int& readBytes, char* temp, char* buf ) {
+void my_read( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readBytes, unsigned char* temp, unsigned char* buf ) {
+  int i;
+
   if (firstBlock) {
     i = offset;
   }
@@ -245,11 +243,11 @@ void read( uint32_t len, SMSA_OFFSET_SIZE offset, boolean firstBlock, int& readB
   }
 
   do {
-    buf[readBytes] = temp[i];
-    readBytes++;
+    buf[*readBytes] = temp[i];
+    (*readBytes)++;
     i++;
      
-  } while( i < SMSA_OFFSET_SIZE && readBytes < len );
+  } while( i < SMSA_OFFSET_SIZE && *readBytes < len );
 
 }
 
@@ -266,7 +264,10 @@ void read( uint32_t len, SMSA_OFFSET_SIZE offset, boolean firstBlock, int& readB
 //                buf - 
 // Outputs      : -1 if failure or the drum id if successful
 
-void write( uint32_t len, SMSA_OFFSET_SIZE offset, boolean firstBlock, int& writtenBytes, char* temp, char* buf ) {
+
+void my_write( uint32_t len, SMSA_BLOCK_ID offset, int firstBlock, int* writtenBytes, unsigned char* temp, unsigned char* buf ) {
+  int i;
+
   if (firstBlock) {
     i = offset;
   }
@@ -275,30 +276,13 @@ void write( uint32_t len, SMSA_OFFSET_SIZE offset, boolean firstBlock, int& writ
   }
 
   do {
-    temp[i] = buf[readBytes];
-    writtenBytes++;
+    int j = *writtenBytes;
+    printf("%d", j);
+    temp[i] = buf[j];
+    (*writtenBytes)++;
     i++;
      
-  } while( i < SMSA_OFFSET_SIZE && writtenBytes < len );
+  } while( i < SMSA_OFFSET_SIZE && *writtenBytes < len );
 
 }
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// Function     : write_to_file
-// Description  : write the bytes in a buffer to a file
-// Inputs       : len - 
-//                offset -
-//                firstBlock - checks if first block to account for offset
-//                readBytes - a reference to the number of bytes already read
-//                temp - the temporary buffer which stores the block data
-//                buf - 
-// Outputs      : -1 if failure or the drum id if successful
-
-void write( char* buf, char* filepath ) {
-  FILE* fOut = fopen(filepath, "w");
-  fprintf( fout, "%s", buf );
-  fclose( fOut );
-}
-
 

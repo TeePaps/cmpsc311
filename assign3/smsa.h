@@ -15,12 +15,12 @@
 #include <stdint.h>
 
 // Defines
-#define SMSA_DISK_ARRAY_SIZE	16
-#define SMSA_DISK_SIZE			  65536
-#define SMSA_BLOCK_SIZE			  256
+#define SMSA_DISK_ARRAY_SIZE  16
+#define SMSA_DISK_SIZE        65536
+#define SMSA_BLOCK_SIZE       256
 #define SMSA_OFFSET_SIZE      (SMSA_DISK_SIZE/SMSA_BLOCK_SIZE)
-#define SMSA_MAX_BLOCK_ID		  (SMSA_DISK_SIZE/SMSA_BLOCK_SIZE)
-#define SMSA_DISK_FILE 			  "smsa_data.dat"
+#define SMSA_MAX_BLOCK_ID     (SMSA_DISK_SIZE/SMSA_BLOCK_SIZE)
+#define SMSA_DISK_FILE        "smsa_data.dat"
 #define SMSA_DRUM_ADDR_BITS   4 
 #define SMSA_BLOCK_ADDR_BITS  8
 #define SMSA_OFFSET_ADDR_BITS 8
@@ -44,7 +44,7 @@ typedef unsigned short SMSA_BLOCK_ID;
 
 // The operations the disk can perform
 typedef enum {
-	SMSA_MOUNT		= 0,  // Mount the disk array
+	SMSA_MOUNT		    = 0,  // Mount the disk array
 	SMSA_UNMOUNT		= 1,  // Unmount the disk array
 	SMSA_SEEK_DRUM		= 2,  // See to a new drum
 	SMSA_SEEK_BLOCK		= 3,  // Seek to a disk address in the current drum
@@ -61,8 +61,8 @@ typedef enum {
 	SMSA_NO_ERROR 				= 0,	// No error has occurred
 	SMSA_UNMOUNTED_DISK			= 1,	// Operation attempted on unmounted disk
 	SMSA_ILLEGAL_DRUM			= 2,	// Operating with bad/illegal drum
-	SMSA_DISK_CACHELOAD_FAIL	        = 3,	// Unable to load array cache file
-	SMSA_DISK_CACHEWRITE_FAIL	        = 4,	// Unable to write array cache file
+	SMSA_DISK_CACHELOAD_FAIL	= 3,	// Unable to load array cache file
+	SMSA_DISK_CACHEWRITE_FAIL	= 4,	// Unable to write array cache file
 	SMSA_BAD_OPCODE				= 5,	// Bad command data
 	SMSA_BAD_DRUM_ID			= 6,	// Bad drum id
 	SMSA_BAD_BLOCK_ID			= 7,	// Bad block ID

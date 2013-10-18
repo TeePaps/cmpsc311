@@ -12,6 +12,7 @@
 
 // Include Files
 #include <stdint.h>
+#include <stdbool.h>
 
 // Project Include Files
 #include <smsa.h>
@@ -19,7 +20,7 @@
 //
 // Type Definitions
 typedef uint32_t SMSA_VIRTUAL_ADDRESS; // SMSA Driver Virtual Addresses
-
+/*typedef enum { false, true } bool;*/
 
 // Interfaces
 int smsa_vmount( void );
