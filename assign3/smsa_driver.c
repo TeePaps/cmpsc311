@@ -22,8 +22,8 @@ SMSA_DRUM_ID get_drum_id( uint32_t addr );
 SMSA_BLOCK_ID get_block_id( uint32_t addr );
 SMSA_BLOCK_ID get_offset( uint32_t addr );
 uint32_t get_instruction( SMSA_DISK_COMMAND opcode, SMSA_DRUM_ID drumId, SMSA_BLOCK_ID blockId );
-void my_read( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readBytes, unsigned char* temp, unsigned char* buf );
-void my_write( uint32_t len, SMSA_BLOCK_ID offset, int firstBlock, int* writtenBytes, unsigned char* temp, unsigned char* buf );
+void read_buf( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readBytes, unsigned char* temp, unsigned char* buf );
+void write_buf( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* writtenBytes, unsigned char* temp, unsigned char* buf );
 
 //
 // Global data
@@ -83,17 +83,14 @@ int smsa_vread( uint32_t addr, uint32_t len, unsigned char *buf ) {
 
     // Loop through as many blocks as necessary
     do {
-      printf("about to seek");
       smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
-      printf("about to read");
       smsa_operation( get_instruction( SMSA_DISK_READ, drum, block ), temp );
-      my_read( len, offset, firstBlock, &readBytes, temp, buf );
+      read_buf( len, offset, firstBlock, &readBytes, temp, buf );
       firstBlock = false;
       block++;
-
     } while ( ( readBytes < len ) && ( block < SMSA_MAX_BLOCK_ID ) );
+    
     drum++;
-
   } while ( readBytes < len );
 
   return 0;
@@ -116,7 +113,7 @@ int smsa_vwrite( uint32_t addr, uint32_t len, unsigned char *buf )  {
   }
 
   // Initialize data
-  int firstBlock = 1;
+  bool firstBlock = true;
   unsigned char temp[SMSA_OFFSET_SIZE]; // temporary byte buffer
   int writtenBytes = 0;
   SMSA_DRUM_ID drum = get_drum_id( addr );
@@ -130,19 +127,19 @@ int smsa_vwrite( uint32_t addr, uint32_t len, unsigned char *buf )  {
     // Loop through as many blocks as necessary
     do {
       smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
+
       if ( firstBlock ) {
         smsa_operation( get_instruction( SMSA_DISK_READ, drum, block ), temp );
         smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
       }
 
-      my_write( len, offset, firstBlock, &writtenBytes, temp, buf );
+      write_buf( len, offset, firstBlock, &writtenBytes, temp, buf );
       smsa_operation( get_instruction( SMSA_DISK_WRITE, drum, block), temp );
       firstBlock = 0;
       block++;
-
     } while ( ( writtenBytes < len ) && ( block < SMSA_MAX_BLOCK_ID ) );
-    drum++;
 
+    drum++;
   } while ( writtenBytes < len );
 
   return 0;
@@ -232,7 +229,7 @@ uint32_t get_instruction ( SMSA_DISK_COMMAND opcode, SMSA_DRUM_ID drumId, SMSA_B
 //                buf - 
 // Outputs      : -1 if failure or the drum id if successful
 
-void my_read( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readBytes, unsigned char* temp, unsigned char* buf ) {
+void read_buf( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readBytes, unsigned char* temp, unsigned char* buf ) {
   int i;
 
   if (firstBlock) {
@@ -243,10 +240,10 @@ void my_read( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readByte
   }
 
   do {
-    buf[*readBytes] = temp[i];
+    int index = *readBytes;
+    buf[index] = temp[i];
     (*readBytes)++;
     i++;
-     
   } while( i < SMSA_OFFSET_SIZE && *readBytes < len );
 
 }
@@ -265,7 +262,7 @@ void my_read( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readByte
 // Outputs      : -1 if failure or the drum id if successful
 
 
-void my_write( uint32_t len, SMSA_BLOCK_ID offset, int firstBlock, int* writtenBytes, unsigned char* temp, unsigned char* buf ) {
+void write_buf( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* writtenBytes, unsigned char* temp, unsigned char* buf ) {
   int i;
 
   if (firstBlock) {
@@ -276,9 +273,8 @@ void my_write( uint32_t len, SMSA_BLOCK_ID offset, int firstBlock, int* writtenB
   }
 
   do {
-    int j = *writtenBytes;
-    printf("%d", j);
-    temp[i] = buf[j];
+    int index = *writtenBytes;
+    temp[i] = buf[index];
     (*writtenBytes)++;
     i++;
      
