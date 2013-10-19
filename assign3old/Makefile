@@ -8,6 +8,8 @@ CFLAGS=-c -Wall -I. -fpic -g
 LINKFLAGS=-L. -g
 LIBFLAGS=-shared -Wall
 LINKLIBS=-lcmpsc311 -lsmsa -lgcrypt
+# Change here for 32 bit version
+#LINKLIBS=-lcmpsc31132 -lsmsa32 -lgcrypt
 
 # Files to build
 SASIM_OBJFILES=		smsa_sim.o \

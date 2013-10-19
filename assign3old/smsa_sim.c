@@ -22,6 +22,7 @@
 #include <smsa_unittest.h>
 #include <smsa_driver.h>
 #include <cmpsc311_log.h>
+#include <cmpsc311_util.h>
 
 // Defines
 #define SMSA_ARGUMENTS "huvl:"
@@ -80,7 +81,7 @@ int main( int argc, char *argv[] )
 			break;
 
 		case 'l': // Set the log filename
-			initializeLogWithFilename( argv[optind] );
+			initializeLogWithFilename( optarg );
 			log_initialized = 1;
 			break;
 
@@ -146,9 +147,9 @@ int simulate_SMSA( char *wload ) {
 
 	// Local variables
 	char line[256], cmd[32];
-	unsigned char buf[SMSA_MAXIMUM_RDWR_SIZE];
+	unsigned char buf[SMSA_MAXIMUM_RDWR_SIZE], sig[CMPSC311_HASH_LENGTH], sigstr[CMPSC311_HASH_LENGTH*4];
 	FILE *fhandle = NULL;
-	uint32_t addr, len, ch;
+	uint32_t addr, len, ch, slen;
 	int i, j, err;
 
 	// Open the workload file
@@ -191,7 +192,7 @@ int simulate_SMSA( char *wload ) {
 			else {
 
 				// Parse out the command
-				if ( sscanf( line, "%7s %7u %3u %3u", cmd, &addr, &len, &ch ) != 4 ) {
+				if ( sscanf( line, "%7s %7u %4u %3u", cmd, &addr, &len, &ch ) != 4 ) {
 					logMessage( LOG_ERROR_LEVEL, "Error parsing virtual command [%s\n]", line );
 					fclose( fhandle );
 					return( -1 );
@@ -200,7 +201,19 @@ int simulate_SMSA( char *wload ) {
 				// Check for read
 				if ( strncmp(SMSA_WORKLOAD_READ, cmd, strlen(SMSA_WORKLOAD_READ)) == 0 ) {
 					logMessage( LOG_INFO_LEVEL, "Calling virtual driver read (addr=%x, len=%u)", addr, len);
-					err = smsa_vread( addr, len, buf );
+
+					// Do the read, fingerprint the returned buffer so we can validate
+					if ( !(err = smsa_vread( addr, len, buf )) ) {
+						if ( generate_md5_signature( buf, len, sig, &slen) ) {
+							logMessage( LOG_ERROR_LEVEL, "SIM Signature failed (%lu)", addr );
+							return( -1 );
+						}
+						bufToString( sig, slen, sigstr, CMPSC311_HASH_LENGTH*4 );
+						logMessage( LOG_INFO_LEVEL, "READ SIG : %lu len %lu - %s", addr, len, sigstr );
+					} else {
+						// Print out error
+						logMessage( LOG_ERROR_LEVEL, "Read failed (%lu,len=%lu)", addr, len );
+					}
 				}
 
 				// Check for write

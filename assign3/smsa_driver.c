@@ -14,7 +14,6 @@
 #include <cmpsc311_log.h>
 
 // Defines
-#define OUTPUT_FILE "./output.txt"
 
 // Functional Prototypes
 bool valid_address( uint32_t addr );
@@ -71,7 +70,7 @@ int smsa_vread( uint32_t addr, uint32_t len, unsigned char *buf ) {
 
   // Initialize data
   bool firstBlock = true;
-  unsigned char temp[( SMSA_DISK_SIZE / SMSA_BLOCK_SIZE )]; // temporary byte buffer
+  unsigned char temp[SMSA_OFFSET_SIZE]; // temporary byte buffer
   int readBytes = 0;
   SMSA_DRUM_ID drum = get_drum_id( addr );
   SMSA_BLOCK_ID block = get_block_id( addr );
@@ -79,7 +78,7 @@ int smsa_vread( uint32_t addr, uint32_t len, unsigned char *buf ) {
 
   // Loop through as many drums as necessary
   do {
-    smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, 0 ), NULL );
+    smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, block ), NULL );
 
     // Loop through as many blocks as necessary
     do {
@@ -91,7 +90,7 @@ int smsa_vread( uint32_t addr, uint32_t len, unsigned char *buf ) {
     } while ( ( readBytes < len ) && ( block < SMSA_MAX_BLOCK_ID ) );
     
     drum++;
-  } while ( readBytes < len );
+  } while ( ( readBytes < len ) && ( drum < SMSA_DISK_ARRAY_SIZE ) );
 
   return 0;
 }
@@ -122,25 +121,24 @@ int smsa_vwrite( uint32_t addr, uint32_t len, unsigned char *buf )  {
 
   // Loop through as many drums as necessary
   do {
-    smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, 0 ), NULL );
+    smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, block ), NULL );
 
     // Loop through as many blocks as necessary
     do {
+      // Read data already present into temporary buffer then seek back to
+      // start of block
       smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
-
-      if ( firstBlock ) {
-        smsa_operation( get_instruction( SMSA_DISK_READ, drum, block ), temp );
-        smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
-      }
+      smsa_operation( get_instruction( SMSA_DISK_READ, drum, block ), temp );
+      smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
 
       write_buf( len, offset, firstBlock, &writtenBytes, temp, buf );
       smsa_operation( get_instruction( SMSA_DISK_WRITE, drum, block), temp );
-      firstBlock = 0;
+      firstBlock = false;
       block++;
     } while ( ( writtenBytes < len ) && ( block < SMSA_MAX_BLOCK_ID ) );
 
     drum++;
-  } while ( writtenBytes < len );
+  } while ( ( writtenBytes < len ) && ( drum < SMSA_DISK_ARRAY_SIZE ) );
 
   return 0;
 }
@@ -244,7 +242,7 @@ void read_buf( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readByt
     buf[index] = temp[i];
     (*readBytes)++;
     i++;
-  } while( i < SMSA_OFFSET_SIZE && *readBytes < len );
+  } while( ( i < SMSA_OFFSET_SIZE ) && ( *readBytes < len ) );
 
 }
 
@@ -278,7 +276,7 @@ void write_buf( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* writte
     (*writtenBytes)++;
     i++;
      
-  } while( i < SMSA_OFFSET_SIZE && *writtenBytes < len );
+  } while( ( i < SMSA_OFFSET_SIZE ) && ( *writtenBytes < len ) );
 
 }
 

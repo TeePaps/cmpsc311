@@ -204,12 +204,19 @@ int simulate_SMSA( char *wload ) {
 
 					// Do the read, fingerprint the returned buffer so we can validate
 					if ( !(err = smsa_vread( addr, len, buf )) ) {
+
+						// Setup and do signature
+						slen = CMPSC311_HASH_LENGTH;
+						memset( sig, 0x0, slen );
 						if ( generate_md5_signature( buf, len, sig, &slen) ) {
 							logMessage( LOG_ERROR_LEVEL, "SIM Signature failed (%lu)", addr );
 							return( -1 );
 						}
+
+						// Log the signature
 						bufToString( sig, slen, sigstr, CMPSC311_HASH_LENGTH*4 );
 						logMessage( LOG_INFO_LEVEL, "READ SIG : %lu len %lu - %s", addr, len, sigstr );
+
 					} else {
 						// Print out error
 						logMessage( LOG_ERROR_LEVEL, "Read failed (%lu,len=%lu)", addr, len );
