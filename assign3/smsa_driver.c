@@ -120,8 +120,6 @@ int smsa_vwrite( uint32_t addr, uint32_t len, unsigned char *buf )  {
   SMSA_DRUM_ID drum = get_drum_id( addr );
   SMSA_BLOCK_ID block = get_block_id( addr );
   SMSA_BLOCK_ID offset = get_offset( addr );
-
- printf("Inside block loop: drum = %d/\tblock = %d/\toffset = %d/\n", drum,block,offset);
   
   // Loop through as many drums as necessary
   do {
@@ -129,8 +127,6 @@ int smsa_vwrite( uint32_t addr, uint32_t len, unsigned char *buf )  {
 
     // Loop through as many blocks as necessary
     do {
-      printf("Inside block loop: drum = %d/\tblock = %d/\toffset = %d/\n", drum,block,offset);
-
       // Read data already present into temporary buffer then seek back to
       // start of block
       smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
