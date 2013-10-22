@@ -12,6 +12,7 @@
 // Project Include Files
 #include <smsa_driver.h>
 #include <cmpsc311_log.h>
+#include <assert.h>
 
 // Defines
 
@@ -90,6 +91,7 @@ int smsa_vread( uint32_t addr, uint32_t len, unsigned char *buf ) {
     } while ( ( readBytes < len ) && ( block < SMSA_MAX_BLOCK_ID ) );
     
     drum++;
+    block = 0;
   } while ( ( readBytes < len ) && ( drum < SMSA_DISK_ARRAY_SIZE ) );
 
   return 0;
@@ -119,16 +121,21 @@ int smsa_vwrite( uint32_t addr, uint32_t len, unsigned char *buf )  {
   SMSA_BLOCK_ID block = get_block_id( addr );
   SMSA_BLOCK_ID offset = get_offset( addr );
 
+ printf("Inside block loop: drum = %d/\tblock = %d/\toffset = %d/\n", drum,block,offset);
+  
   // Loop through as many drums as necessary
   do {
     smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, block ), NULL );
 
     // Loop through as many blocks as necessary
     do {
+      printf("Inside block loop: drum = %d/\tblock = %d/\toffset = %d/\n", drum,block,offset);
+
       // Read data already present into temporary buffer then seek back to
       // start of block
       smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
       smsa_operation( get_instruction( SMSA_DISK_READ, drum, block ), temp );
+      smsa_operation( get_instruction( SMSA_SEEK_DRUM, drum, block ), NULL );
       smsa_operation( get_instruction( SMSA_SEEK_BLOCK, drum, block ), NULL );
 
       write_buf( len, offset, firstBlock, &writtenBytes, temp, buf );
@@ -138,6 +145,7 @@ int smsa_vwrite( uint32_t addr, uint32_t len, unsigned char *buf )  {
     } while ( ( writtenBytes < len ) && ( block < SMSA_MAX_BLOCK_ID ) );
 
     drum++;
+    block = 0;
   } while ( ( writtenBytes < len ) && ( drum < SMSA_DISK_ARRAY_SIZE ) );
 
   return 0;
@@ -243,6 +251,7 @@ void read_buf( uint32_t len, SMSA_BLOCK_ID offset, bool firstBlock, int* readByt
     (*readBytes)++;
     i++;
   } while( ( i < SMSA_OFFSET_SIZE ) && ( *readBytes < len ) );
+  assert(i <=256);
 
 }
 
